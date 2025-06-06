@@ -42,6 +42,15 @@ struct TypeEffectiveness {
     unordered_map<string, float> effectiveness;
 };
 
+struct AttackResult {
+    string pokemonName;
+    string moveName;
+    string moveType;
+    float minDamage;
+    float maxDamage;
+};
+
+
 // Variables globales
 sf::Texture typesTexture;
 unordered_map<string, sf::Sprite> typeSprites;
@@ -878,19 +887,15 @@ void calcularDanio(const Pokemon& atacante, const Pokemon& defensor, const Move&
     cout << "  Mayor posible: " << floor(danioMax) << endl;
 }
 
-void procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDropdowns, 
+vector<AttackResult> procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDropdowns, 
              const unordered_map<string, Pokemon>& pokedex,
              const unordered_map<string, vector<string>>& pokemonStats) {
+    vector<AttackResult> results;
     string mainName = mainDropdown.getSelectedItem();
     
     // Obtener Pokémon principal (solo para mostrar info)
     auto mainIt = pokedex.find(mainName);
-    if (mainIt != pokedex.end()) {
-        cout << "Pokémon rival: " << mainName << " (Nivel " << mainDropdown.getLevel() << ")" << endl;
-        cout << "Tipos: ";
-        for (const auto& type : mainIt->second.types) cout << type << " ";
-        cout << endl;
-    }
+    if (mainIt == pokedex.end()) return results;
 
     // Procesar cada Pokémon de la derecha
     for (size_t i = 0; i < rightDropdowns.size(); ++i) {
@@ -898,38 +903,138 @@ void procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDropdowns,
         if (name.empty()) continue;
 
         auto it = pokedex.find(name);
-        if (it != pokedex.end()) {
-            cout << "\nPokémon equipo " << i+1 << ": " << name << endl;
-            cout << "Tipos: ";
-            for (const auto& type : it->second.types) cout << type << " ";
-            cout << endl;
+        if (it == pokedex.end()) continue;
 
-            // Calcular daño para cada ataque
-            const auto& moves = rightDropdowns[i].getMoves();
-            if (moves.empty()) {
-                cout << "  No tiene ataques seleccionados" << endl;
-                continue;
-            }
+        // Calcular daño para cada ataque
+        const auto& moves = rightDropdowns[i].getMoves();
+        if (moves.empty()) continue;
 
-            for (const auto& movePair : moves) {
-                auto moveIt = find_if(movesDatabase.begin(), movesDatabase.end(),
-                    [&](const pair<string, Move>& m) { return m.second.name == movePair.first; });
-                
-                if (moveIt != movesDatabase.end()) {
-                    // Crear Pokémon atacante con los datos del principal
-                    Pokemon atacante;
-                    atacante.name = mainName;
-                    atacante.level = mainDropdown.getLevel();
-                    atacante.types = mainIt->second.types;
+        for (const auto& movePair : moves) {
+            auto moveIt = find_if(movesDatabase.begin(), movesDatabase.end(),
+                [&](const pair<string, Move>& m) { return m.second.name == movePair.first; });
+            
+            if (moveIt != movesDatabase.end()) {
+                // Crear Pokémon atacante con los datos del principal
+                Pokemon atacante;
+                atacante.name = mainName;
+                atacante.level = mainDropdown.getLevel();
+                atacante.types = mainIt->second.types;
 
-                    calcularDanio(atacante, it->second, moveIt->second, pokemonStats);
+                // Obtener stats del defensor
+                auto defensorStats = pokemonStats.find(name);
+                if (defensorStats == pokemonStats.end()) continue;
+
+                // Obtener stats del atacante
+                auto atacanteStats = pokemonStats.find(mainName);
+                if (atacanteStats == pokemonStats.end()) continue;
+
+                // Obtener valores necesarios
+                int N = std::stoi(atacante.level);
+                int A, D;
+                if (moveIt->second.category == "Physical") {
+                    string AA = atacanteStats->second[11];
+                    string BB = defensorStats->second[13];
+                    A = std::stoi(AA);
+                    D = std::stoi(BB);
+                } else if (moveIt->second.category == "Special") {
+                    string AA = atacanteStats->second[12];
+                    string BB = defensorStats->second[14];
+                    A = std::stoi(AA);
+                    D = std::stoi(BB);
+                } else {
+                    continue; // Saltar ataques de estado
                 }
+
+                string PP = moveIt->second.power;
+                if (PP.empty()) PP = "0";
+                int P = std::stoi(PP);
+
+                // Calcular bonificación (B)
+                float B = 1.0f;
+                for (const auto& tipo : atacante.types) {
+                    if (tipo == moveIt->second.type) {
+                        B = 1.5f;
+                        break;
+                    }
+                }
+
+                // Calcular efectividad (E)
+                float E = 1.0f;
+                for (const auto& entry : typeChart) {
+                    if ((entry.defense_type1 == it->second.types[0] && 
+                         (it->second.types.size() < 2 || entry.defense_type2 == it->second.types[1])) ||
+                        (it->second.types.size() > 1 && entry.defense_type1 == it->second.types[1] && 
+                         entry.defense_type2 == it->second.types[0])) {
+                        
+                        auto effIt = entry.effectiveness.find(moveIt->second.type);
+                        if (effIt != entry.effectiveness.end()) {
+                            E = effIt->second;
+                        }
+                        break;
+                    }
+                }
+
+                // Calcular daño para V=85 y V=100
+                float danioMin = 0.01f * B * E * 85 * ((((0.2f * N + 1) * A * P) / (25 * D)) + 2);
+                float danioMax = 0.01f * B * E * 100 * ((((0.2f * N + 1) * A * P) / (25 * D)) + 2);
+
+                // Agregar a resultados
+                results.push_back({
+                    name,
+                    moveIt->second.name,
+                    moveIt->second.type,
+                    floor(danioMin),
+                    floor(danioMax)
+                });
             }
         }
     }
+
+    // Ordenar resultados por daño máximo (descendente)
+    sort(results.begin(), results.end(), [](const AttackResult& a, const AttackResult& b) {
+        return a.maxDamage > b.maxDamage;
+    });
+
+    return results;
 }
+void drawResults(sf::RenderWindow& window, const vector<AttackResult>& results, sf::Font& font) {
+    if (results.empty()) return;
 
+    float startX = 1200; // Posición derecha para la lista
+    float startY = 100;
+    float lineHeight = 30;
 
+    sf::Text title("Mejores ataques:", font, 20);
+    title.setPosition(startX, startY - 40);
+    title.setFillColor(sf::Color::Black);
+    window.draw(title);
+
+    for (size_t i = 0; i < results.size(); ++i) {
+        const auto& result = results[i];
+
+        // Nombre del ataque
+        sf::Text moveText(result.moveName, font, 16);
+        moveText.setPosition(startX, startY + i * lineHeight);
+        moveText.setFillColor(sf::Color::Black);
+        window.draw(moveText);
+
+        // Daño
+        string damageStr = to_string((int)result.minDamage) + "-" + to_string((int)result.maxDamage);
+        sf::Text damageText(damageStr, font, 16);
+        damageText.setPosition(startX + 200, startY + i * lineHeight);
+        damageText.setFillColor(sf::Color::Black);
+        window.draw(damageText);
+
+        // Imagen del Pokémon (10x10)
+        sf::Texture pokemonTexture;
+        if (pokemonTexture.loadFromFile("Pokemon_Dataset/" + result.pokemonName + ".png")) {
+            sf::Sprite pokemonSprite(pokemonTexture);
+            pokemonSprite.setPosition(startX + 300, startY + i * lineHeight);
+            pokemonSprite.setScale(50.0f / pokemonTexture.getSize().x, 50.0f / pokemonTexture.getSize().y);
+            window.draw(pokemonSprite);
+        }
+    }
+}
 int main() {
     // Cargar datos necesarios
     loadTypeChart("type-chart.csv");
@@ -937,6 +1042,7 @@ int main() {
     loadMovesData("moves.csv");
 
     vector<string> pokemonNames;
+    vector<AttackResult> currentResults;
     auto pokedex = loadPokemonData("pokemon_data.csv", pokemonNames);
 
     if (pokemonNames.empty()) {
@@ -969,7 +1075,7 @@ int main() {
     Dropdown mainDropdown(40, 50, screenWidth / 3.0f - 80, 30.0f, pokemonNames, globalFont);
 
     vector<Dropdown> rightDropdowns;
-    float rightStartX = screenWidth * 1.0f / 2.0f + 40;
+    float rightStartX = screenWidth * 1.0f / 2.0f - 160;
     float spacingX = 160;
     float spacingY = 320;
     for (int i = 0; i < 6; ++i) {
@@ -999,7 +1105,7 @@ int main() {
 
             if (event.type == sf::Event::MouseButtonPressed) {
                 if (botonProcesar.getGlobalBounds().contains(mousePos)) {
-                    procesar(mainDropdown, rightDropdowns, pokedex, pokemonStats);
+                    currentResults = procesar(mainDropdown, rightDropdowns, pokedex, pokemonStats);
                 }
             }
         }
@@ -1011,6 +1117,7 @@ int main() {
             dd.draw(window);
         window.draw(botonProcesar);
         window.draw(textoProcesar);
+        drawResults(window, currentResults, globalFont);
         window.display();
     }
 
