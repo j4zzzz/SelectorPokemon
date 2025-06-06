@@ -49,7 +49,7 @@ unordered_map<string, Move> movesDatabase;
 vector<TypeEffectiveness> typeChart;
 sf::Font globalFont;
 
-// Función para cargar los ataques desde CSV (sin stoi)
+// Función para cargar los ataques desde moves.csv
 void loadMovesData(const string& filename) {
     ifstream file(filename);
     if (!file.is_open()) {
@@ -62,6 +62,7 @@ void loadMovesData(const string& filename) {
     getline(file, line);
 
     while (getline(file, line)) {
+        //id,name,type,category,power,accuracy,priority,crit
         stringstream ss(line);
         string token;
         Move m;
@@ -71,13 +72,6 @@ void loadMovesData(const string& filename) {
 
         // Nombre
         getline(ss, m.name, ',');
-
-        // Descripción (puede contener comas)
-        string description;
-        getline(ss, description, '"'); // Leer hasta la primera comilla
-        getline(ss, description, '"');  // Leer la descripción entre comillas
-        m.description = description;
-        getline(ss, token, ','); // Leer la coma después de la descripción
 
         // Tipo
         getline(ss, m.type, ',');
@@ -91,12 +85,6 @@ void loadMovesData(const string& filename) {
         // Accuracy
         getline(ss, m.accuracy, ',');
 
-        // PP
-        getline(ss, m.pp, ',');
-
-        // Z-Effect
-        getline(ss, m.z_effect, ',');
-
         // Priority
         getline(ss, m.priority, ',');
 
@@ -106,6 +94,7 @@ void loadMovesData(const string& filename) {
         movesDatabase[m.id] = m;
     }
 }
+
 // Función para cargar la tabla de efectividad de tipos
 void loadTypeChart(const string& filename) {
     ifstream file(filename);
@@ -234,9 +223,10 @@ unordered_map<string, Pokemon> loadPokemonData(const string& filename, vector<st
 
     while (getline(file, line)) {
         stringstream ss(line);
-        string id, name, typesStr;
+        string id,id2, name, typesStr;
 
         getline(ss, id, ',');     // saltar número
+        getline(ss, id2, ',');     // saltar número2
         getline(ss, name, ',');   // obtener nombre
         getline(ss, typesStr, ','); // obtener tipos
 
@@ -834,7 +824,7 @@ void calcularDanio(const Pokemon& atacante, const Pokemon& defensor, const Move&
     
 
     // Obtener valores necesarios
-    cout<<atacante.level<<"WA"<<atacanteStats->second[11]<<"WA"<<defensorStats->second[13]<<"WA"<<atacanteStats->second[12]<<"WA"<<defensorStats->second[14]<<"WA"<<move.power<<"WA"<<move.accuracy<<endl;
+    //cout<<atacante.level<<"WA"<<atacanteStats->second[11]<<"WA"<<defensorStats->second[13]<<"WA"<<atacanteStats->second[12]<<"WA"<<defensorStats->second[14]<<"WA"<<move.power<<"WA"<<move.accuracy<<endl;
     int N = std::stoi(atacante.level); // Nivel del atacante
     int A, D;
     if (move.category == "Physical") {
@@ -896,7 +886,7 @@ void procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDropdowns,
     // Obtener Pokémon principal (solo para mostrar info)
     auto mainIt = pokedex.find(mainName);
     if (mainIt != pokedex.end()) {
-        cout << "Pokémon principal: " << mainName << " (Nivel " << mainDropdown.getLevel() << ")" << endl;
+        cout << "Pokémon rival: " << mainName << " (Nivel " << mainDropdown.getLevel() << ")" << endl;
         cout << "Tipos: ";
         for (const auto& type : mainIt->second.types) cout << type << " ";
         cout << endl;
@@ -909,7 +899,7 @@ void procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDropdowns,
 
         auto it = pokedex.find(name);
         if (it != pokedex.end()) {
-            cout << "\nPokémon rival " << i+1 << ": " << name << endl;
+            cout << "\nPokémon equipo " << i+1 << ": " << name << endl;
             cout << "Tipos: ";
             for (const auto& type : it->second.types) cout << type << " ";
             cout << endl;
@@ -954,8 +944,8 @@ int main() {
         return 1;
     }
 
-    int screenWidth = 1200;
-    int screenHeight = 800;
+    int screenWidth = 1600;
+    int screenHeight = 900;
     sf::RenderWindow window(sf::VideoMode(screenWidth, screenHeight), "Sistema Experto - Pokémon");
 
     if (!globalFont.loadFromFile("arial.ttf")) {
