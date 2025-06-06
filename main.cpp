@@ -7,15 +7,18 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <algorithm>
+#include <cmath>
 
 using namespace std;
 
 // Estructura para almacenar datos de Pokémon
 struct Pokemon {
-    std::string name;
-    std::vector<std::string> types;
-    int level = 50; // Nivel por defecto
+    string name;
+    vector<string> types;
+    string level = "50";
     vector<pair<string, string>> moves; // Nombre y tipo de los ataques
+    vector<string> stats; // Para almacenar los stats del pokemon (defensa, ataque, etc.)
 };
 
 // Estructura para almacenar datos de Ataques
@@ -24,18 +27,26 @@ struct Move {
     string name;
     string description;
     string type;
-    string category;
-    string power;  // Cambiado a string
+    string category; // "Physical", "Special" o "Status"
+    string power;
     string accuracy;
-    string pp;     // Cambiado a string
+    string pp;
     string z_effect;
-    string priority; // Cambiado a string
-    string crit;     // Cambiado a string
+    string priority;
+    string crit;
 };
+
+struct TypeEffectiveness {
+    string defense_type1;
+    string defense_type2;
+    unordered_map<string, float> effectiveness;
+};
+
 // Variables globales
 sf::Texture typesTexture;
-std::unordered_map<std::string, sf::Sprite> typeSprites;
-unordered_map<string, Move> movesDatabase; // Cambiado a string como clave
+unordered_map<string, sf::Sprite> typeSprites;
+unordered_map<string, Move> movesDatabase;
+vector<TypeEffectiveness> typeChart;
 sf::Font globalFont;
 
 // Función para cargar los ataques desde CSV (sin stoi)
@@ -95,7 +106,82 @@ void loadMovesData(const string& filename) {
         movesDatabase[m.id] = m;
     }
 }
+// Función para cargar la tabla de efectividad de tipos
+void loadTypeChart(const string& filename) {
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Error al abrir " << filename << endl;
+        return;
+    }
 
+    string line;
+    // Leer encabezado
+    getline(file, line);
+    stringstream header(line);
+    string token;
+    vector<string> attackTypes;
+
+    // Leer tipos de ataque (3ra columna en adelante)
+    for (int i = 0; i < 2; i++) getline(header, token, ','); // Saltar primeras 2 columnas
+    while (getline(header, token, ',')) {
+        attackTypes.push_back(token);
+    }
+
+    // Leer el resto del archivo
+    while (getline(file, line)) {
+        stringstream ss(line);
+        TypeEffectiveness te;
+        
+        // Leer tipos de defensa
+        getline(ss, te.defense_type1, ',');
+        getline(ss, te.defense_type2, ',');
+
+        // Leer efectividades
+        string effStr;
+        for (size_t i = 0; i < attackTypes.size(); i++) {
+            if (!getline(ss, effStr, ',')) break;
+            te.effectiveness[attackTypes[i]] = stof(effStr);
+        }
+
+        typeChart.push_back(te);
+    }
+}
+
+
+unordered_map<string, vector<string>> loadPokemonStats(const string& filename) {
+    unordered_map<string, vector<string>> statsMap;
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Error al abrir " << filename << endl;
+        return statsMap;
+    }
+
+    string line;
+    // Saltar encabezado
+    getline(file, line);
+
+    while (getline(file, line)) {
+        stringstream ss(line);
+        vector<string> stats;
+        string token;
+
+        while (getline(ss, token, ',')) {
+            stats.push_back(token);
+        }
+
+        if (stats.size() > 2) {  // Asegurarnos que hay al menos 3 columnas
+            // Usar la tercera columna (species) como clave
+            string name = stats[2];
+            // Eliminar comillas si existen
+            if (!name.empty() && name.front() == '"' && name.back() == '"') {
+                name = name.substr(1, name.size()-2);
+            }
+            statsMap[name] = stats;
+        }
+    }
+
+    return statsMap;
+}
 
 // Función para inicializar los sprites de tipos
 void initTypeSprites() {
@@ -172,6 +258,8 @@ unordered_map<string, Pokemon> loadPokemonData(const string& filename, vector<st
     
     return pokedex;
 }
+
+
 
 // Clase para el input de nivel
 class LevelInput {
@@ -721,37 +809,141 @@ void mostrarTipos(const vector<string>& types, int pokemonNum, Dropdown& dropdow
     cout << endl;
 }
 
-// Función para procesar la selección
-void procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDropdowns, const unordered_map<string, Pokemon>& pokedex) {
-    string mainName = mainDropdown.getSelectedItem();
-    
-    auto mainIt = pokedex.find(mainName);
-    if (mainIt != pokedex.end()) {
-        mostrarTipos(mainIt->second.types, 0, mainDropdown);
-    } else {
-        cout << "Pokémon principal (" << mainName << ") no encontrado en la base de datos." << endl;
+
+
+void calcularDanio(const Pokemon& atacante, const Pokemon& defensor, const Move& move, 
+                  const unordered_map<string, vector<string>>& pokemonStats) {
+    if (move.category == "Status") {
+        cout << "El ataque " << move.name << " es de estado y no causa daño." << endl;
+        return;
     }
 
+    // Obtener stats del defensor
+    auto defensorStats = pokemonStats.find(defensor.name);
+    if (defensorStats == pokemonStats.end()) {
+        cerr << "No se encontraron stats para " << defensor.name << endl;
+        return;
+    }
+
+    // Obtener stats del atacante
+    auto atacanteStats = pokemonStats.find(atacante.name);
+    if (atacanteStats == pokemonStats.end()) {
+        cerr << "No se encontraron stats para " << atacante.name << endl;
+        return;
+    }
+    
+
+    // Obtener valores necesarios
+    cout<<atacante.level<<"WA"<<atacanteStats->second[11]<<"WA"<<defensorStats->second[13]<<"WA"<<atacanteStats->second[12]<<"WA"<<defensorStats->second[14]<<"WA"<<move.power<<"WA"<<move.accuracy<<endl;
+    int N = std::stoi(atacante.level); // Nivel del atacante
+    int A, D;
+    if (move.category == "Physical") {
+        string AA = atacanteStats->second[11];
+        string BB = atacanteStats->second[13];
+        A = std::stoi(AA); // Ataque (columna 12)
+        D = std::stoi(BB); // Defensa (columna 14)
+    } else { // Special
+        string AA = atacanteStats->second[12];
+        string BB = atacanteStats->second[14];
+        A = std::stoi(AA); // Ataque especial (columna 13)
+        D = std::stoi(BB); // Defensa especial (columna 15)
+    }
+    string PP = move.power;
+    int P = std::stoi(PP);
+
+    // Calcular bonificación (B)
+    float B = 1.0f;
+    for (const auto& tipo : atacante.types) {
+        if (tipo == move.type) {
+            B = 1.5f;
+            break;
+        }
+    }
+
+    // Calcular efectividad (E)
+    float E = 1.0f;
+    for (const auto& entry : typeChart) {
+        if ((entry.defense_type1 == defensor.types[0] && 
+             (defensor.types.size() < 2 || entry.defense_type2 == defensor.types[1])) ||
+            (defensor.types.size() > 1 && entry.defense_type1 == defensor.types[1] && 
+             entry.defense_type2 == defensor.types[0])) {
+            
+            auto it = entry.effectiveness.find(move.type);
+            if (it != entry.effectiveness.end()) {
+                E = it->second;
+            }
+            break;
+        }
+    }
+
+    // Calcular daño para V=85 y V=100
+    float danioMin = 0.01f * B * E * 85 * ((((0.2f * N + 1) * A * P) / (25 * D)) + 2);
+    float danioMax = 0.01f * B * E * 100 * ((((0.2f * N + 1) * A * P) / (25 * D)) + 2);
+
+    // Mostrar resultados
+    cout << "Ataque: " << move.name << " (" << move.type << ")" << endl;
+    cout << "  Efectividad (E): " << E << endl;
+    cout << "  Bonificación (B): " << B << endl;
+    cout << "  Menor posible: " << floor(danioMin) << endl;
+    cout << "  Mayor posible: " << floor(danioMax) << endl;
+}
+
+void procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDropdowns, 
+             const unordered_map<string, Pokemon>& pokedex,
+             const unordered_map<string, vector<string>>& pokemonStats) {
+    string mainName = mainDropdown.getSelectedItem();
+    
+    // Obtener Pokémon principal (solo para mostrar info)
+    auto mainIt = pokedex.find(mainName);
+    if (mainIt != pokedex.end()) {
+        cout << "Pokémon principal: " << mainName << " (Nivel " << mainDropdown.getLevel() << ")" << endl;
+        cout << "Tipos: ";
+        for (const auto& type : mainIt->second.types) cout << type << " ";
+        cout << endl;
+    }
+
+    // Procesar cada Pokémon de la derecha
     for (size_t i = 0; i < rightDropdowns.size(); ++i) {
         string name = rightDropdowns[i].getSelectedItem();
+        if (name.empty()) continue;
+
         auto it = pokedex.find(name);
         if (it != pokedex.end()) {
-            mostrarTipos(it->second.types, i + 1, rightDropdowns[i]);
-            
-            // Mostrar ataques seleccionados
+            cout << "\nPokémon rival " << i+1 << ": " << name << endl;
+            cout << "Tipos: ";
+            for (const auto& type : it->second.types) cout << type << " ";
+            cout << endl;
+
+            // Calcular daño para cada ataque
             const auto& moves = rightDropdowns[i].getMoves();
-            cout << "Ataques de " << name << ":" << endl;
-            for (const auto& move : moves) {
-                cout << "- " << move.first << " (" << move.second << ")" << endl;
+            if (moves.empty()) {
+                cout << "  No tiene ataques seleccionados" << endl;
+                continue;
             }
-        } else {
-            cout << "Pokémon " << i + 1 << " (" << name << ") no encontrado en la base de datos." << endl;
+
+            for (const auto& movePair : moves) {
+                auto moveIt = find_if(movesDatabase.begin(), movesDatabase.end(),
+                    [&](const pair<string, Move>& m) { return m.second.name == movePair.first; });
+                
+                if (moveIt != movesDatabase.end()) {
+                    // Crear Pokémon atacante con los datos del principal
+                    Pokemon atacante;
+                    atacante.name = mainName;
+                    atacante.level = mainDropdown.getLevel();
+                    atacante.types = mainIt->second.types;
+
+                    calcularDanio(atacante, it->second, moveIt->second, pokemonStats);
+                }
+            }
         }
     }
 }
 
+
 int main() {
-    // Cargar datos de ataques
+    // Cargar datos necesarios
+    loadTypeChart("type-chart.csv");
+    auto pokemonStats = loadPokemonStats("pokemon.csv");
     loadMovesData("moves.csv");
 
     vector<string> pokemonNames;
@@ -817,7 +1009,7 @@ int main() {
 
             if (event.type == sf::Event::MouseButtonPressed) {
                 if (botonProcesar.getGlobalBounds().contains(mousePos)) {
-                    procesar(mainDropdown, rightDropdowns, pokedex);
+                    procesar(mainDropdown, rightDropdowns, pokedex, pokemonStats);
                 }
             }
         }
