@@ -772,7 +772,7 @@ void drawResults(sf::RenderWindow& window, const vector<AttackResult>& results, 
         damageText.setPosition(startX + 200, startY + i * lineHeight);
         damageText.setFillColor(sf::Color::Black);
         window.draw(damageText);
-
+        
         sf::Texture pokemonTexture;
         if (pokemonTexture.loadFromFile("Pokemon_Dataset/" + result.pokemonName + ".png")) {
             sf::Sprite pokemonSprite(pokemonTexture);
@@ -847,21 +847,9 @@ vector<AttackResult> procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDro
                 }
 
                 // Calcular efectividad del ataque (E)
-
-
-                                
-                                // Calcular efectividad del ataque (E)
                 float E = 1.0f;
                 const string& attackType = movePair.second; // Tipo del movimiento del atacante
                 const vector<string>& defenseTypes = mainIt->second.types; // Tipos del defensor (izquierda)
-
-                // Debug: Mostrar información clave
-                cout << "\n--- Cálculo de efectividad ---" << endl;
-                cout << "DEFENSOR (Izquierda): " << mainName << " (Tipos: ";
-                for (const auto& t : defenseTypes) cout << t << " ";
-                cout << ")" << endl;
-                cout << "ATACANTE (Derecha): " << name << endl;
-                cout << "MOVIMIENTO: " << movePair.first << " (Tipo: " << attackType << ")" << endl;
 
                 // 1. Obtener los nombres de los tipos de ataque (cabecera)
                 static vector<string> attackTypeHeaders = [](){
@@ -898,7 +886,6 @@ vector<AttackResult> procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDro
                         // Caso de un solo tipo
                         defenseRow.push_back(line);
                         foundRow = true;
-                        cout << "[DEBUG] Encontrada fila para tipo único: " << type1 << endl;
                         break;
                     }
                     else if (defenseTypes.size() == 2 && 
@@ -907,30 +894,18 @@ vector<AttackResult> procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDro
                         // Caso de dos tipos
                         defenseRow.push_back(line);
                         foundRow = true;
-                        cout << "[DEBUG] Encontrada fila para tipos combinados: " << type1 << "/" << type2 << endl;
                         break;
                     }
                 }
-
-                if (!foundRow) {
-                    cout << "[DEBUG] No se encontró fila exacta, usando efectividad 1.0" << endl;
-                    cout << "--- Efectividad FINAL: 1 ---" << endl;
-                    return results; // O continuar con E = 1.0
-                }
-
+                //cout<<"aaaaaaa";
                 // 3. Buscar el índice del tipo de ataque en la cabecera
                 int attackTypeIndex = -1;
                 for (size_t i = 0; i < attackTypeHeaders.size(); ++i) {
+                    //cout<<attackTypeHeaders[i];
                     if (attackTypeHeaders[i] == attackType) {
                         attackTypeIndex = i;
                         break;
                     }
-                }
-
-                if (attackTypeIndex == -1) {
-                    cout << "[DEBUG] Tipo de ataque no encontrado en cabecera, usando efectividad 1.0" << endl;
-                    cout << "--- Efectividad FINAL: 1 ---" << endl;
-                    return results; // O continuar con E = 1.0
                 }
 
                 // 4. Obtener el valor de efectividad de la fila encontrada
@@ -948,40 +923,31 @@ vector<AttackResult> procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDro
 
                 if (attackTypeIndex < rowValues.size()) {
                     string effStr = rowValues[attackTypeIndex];
-                    cout << "[DEBUG] Valor crudo de efectividad: " << effStr << endl;
 
-                    if (effStr == "0") {
+                    if (effStr == "0.0") {
                         E = 0.0f;
-                        cout << "[DEBUG] Inmunidad detectada (0)" << endl;
                     } 
                     else if (effStr == "0.5") {
                         E = 0.5f;
-                        cout << "[DEBUG] Resistencia detectada (0.5)" << endl;
                     }
-                    else if (effStr == "2") {
+                    else if (effStr == "2.0") {
                         E = 2.0f;
-                        cout << "[DEBUG] Debilidad detectada (2)" << endl;
+                        
                     }
-                    else if (effStr == "1") {
+                    else if (effStr == "1.0") {
                         E = 1.0f;
-                        cout << "[DEBUG] Efectividad normal (1)" << endl;
+                    }
+                    else if (effStr == "0.25") {
+                        E = 0.25f;
                     }
                     else {
-                        cout << "[DEBUG] Valor no reconocido, usando 1.0" << endl;
                         E = 1.0f;
                     }
                 } else {
-                    cout << "[DEBUG] Índice fuera de rango, usando efectividad 1.0" << endl;
                     E = 1.0f;
                 }
 
-                cout << "--- Efectividad FINAL: " << E << " ---" << endl;
-
-
-                        
-                cout<<E;
-
-
+                //cout<<E;
                 float danioMin = 0.01f * B * E * 85 * ((((0.2f * N + 1) * A * P) / (25 * D)) + 2);
                 float danioMax = 0.01f * B * E * 100 * ((((0.2f * N + 1) * A * P) / (25 * D)) + 2);
 
