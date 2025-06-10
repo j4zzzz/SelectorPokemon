@@ -301,7 +301,7 @@ class MoveSelector {
 public:
     MoveSelector(float x, float y, float width, float height, const vector<string>& moves, sf::Font& font)
         : allMoves(moves), filteredMoves(moves), font(font), isActive(false), 
-          selectedIndex(-1), startIndex(0), maxVisible(7) {
+          selectedIndex(-1), startIndex(0), maxVisible(5) {
         
         background.setPosition(x, y);
         background.setSize({width, height});
@@ -482,31 +482,32 @@ private:
 class Dropdown {
 public:
     Dropdown(float x, float y, float width, float height, const vector<string>& items, sf::Font& font)
-        : allItems(items), filteredItems(items), expanded(false), selectedIndex(-1), 
-          startIndex(0), maxVisible(7), font(font), isTyping(false), 
-          typingText(""), typingClock(), lastTypingTime(0) {
-        
-        box.setPosition(x, y);
-        box.setSize({width, height});
-        box.setFillColor(sf::Color(180, 180, 180));
+    : allItems(items), filteredItems(items), expanded(false), selectedIndex(-1), 
+      startIndex(0), maxVisible(7), font(font), isTyping(false), 
+      typingText(""), typingClock(), lastTypingTime(0) {
+    
+    box.setPosition(x, y);
+    box.setSize({width, height});
+    box.setFillColor(sf::Color(180, 180, 180));
 
-        label.setFont(font);
-        label.setString("Seleccionar...");
-        label.setCharacterSize(14);
-        label.setPosition(x + 5, y + 5);
-        label.setFillColor(sf::Color::Black);
+    label.setFont(font);
+    label.setString("Seleccionar...");
+    label.setCharacterSize(14);
+    label.setPosition(x + 5, y + 5);
+    label.setFillColor(sf::Color::Black);
 
-        image.setPosition(x, y + height + 5); 
+    image.setPosition(x, y + height + 5); 
 
-        levelInput = make_unique<LevelInput>(x, y + height + 200, 50, 25, font);
+    levelInput = make_unique<LevelInput>(x, y + height + 200, 50, 25, font);
 
-        vector<string> moveNames;
-        for (const auto& pair : Resources::movesDatabase) {
-            moveNames.push_back(pair.second.name);
-        }
-        sort(moveNames.begin(), moveNames.end());
-        moveSelector = make_unique<MoveSelector>(x, y + height + 250, width, 200, moveNames, font);
+    vector<string> moveNames;
+    for (const auto& pair : Resources::movesDatabase) {
+        moveNames.push_back(pair.second.name);
     }
+    sort(moveNames.begin(), moveNames.end());
+    // Cambio aquí - nueva posición Y para el MoveSelector
+    moveSelector = make_unique<MoveSelector>(x, y + height+20, width, 200, moveNames, font);
+}
 
     void draw(sf::RenderWindow& window) {
         window.draw(box);
@@ -782,7 +783,6 @@ void drawResults(sf::RenderWindow& window, const vector<AttackResult>& results, 
         }
     }
 }
-
 vector<AttackResult> procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDropdowns, 
              const unordered_map<string, Pokemon>& pokedex,
              const unordered_map<string, vector<string>>& pokemonStats) {
@@ -802,23 +802,26 @@ vector<AttackResult> procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDro
         const auto& moves = rightDropdowns[i].getMoves();
         if (moves.empty()) continue;
 
+        // Obtener el nivel del Pokémon atacante actual (de la derecha)
+        string attackerLevel = rightDropdowns[i].getLevel();
+
         for (const auto& movePair : moves) {
             auto moveIt = find_if(Resources::movesDatabase.begin(), Resources::movesDatabase.end(),
                 [&](const pair<string, Move>& m) { return m.second.name == movePair.first; });
             
             if (moveIt != Resources::movesDatabase.end()) {
                 Pokemon atacante;
-                atacante.name = mainName;
-                atacante.level = mainDropdown.getLevel();
-                atacante.types = mainIt->second.types;
+                atacante.name = name;  // Nombre del atacante (derecha)
+                atacante.level = attackerLevel;  // Nivel específico de este atacante
+                atacante.types = it->second.types;  // Tipos del atacante
 
-                auto defensorStats = pokemonStats.find(name);
+                auto defensorStats = pokemonStats.find(mainName);  // Estadísticas del defensor (izquierda)
                 if (defensorStats == pokemonStats.end()) continue;
 
-                auto atacanteStats = pokemonStats.find(mainName);
+                auto atacanteStats = pokemonStats.find(name);  // Estadísticas del atacante (derecha)
                 if (atacanteStats == pokemonStats.end()) continue;
 
-                int N = std::stoi(atacante.level);
+                int N = std::stoi(atacante.level);  // Usamos el nivel del atacante
                 int A, D;
                 if (moveIt->second.category == "Physical") {
                     string AA = atacanteStats->second[11];
@@ -897,11 +900,10 @@ vector<AttackResult> procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDro
                         break;
                     }
                 }
-                //cout<<"aaaaaaa";
+
                 // 3. Buscar el índice del tipo de ataque en la cabecera
                 int attackTypeIndex = -1;
                 for (size_t i = 0; i < attackTypeHeaders.size(); ++i) {
-                    //cout<<attackTypeHeaders[i];
                     if (attackTypeHeaders[i] == attackType) {
                         attackTypeIndex = i;
                         break;
@@ -932,7 +934,6 @@ vector<AttackResult> procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDro
                     }
                     else if (effStr == "2.0") {
                         E = 2.0f;
-                        
                     }
                     else if (effStr == "1.0") {
                         E = 1.0f;
@@ -947,7 +948,6 @@ vector<AttackResult> procesar(Dropdown& mainDropdown, vector<Dropdown>& rightDro
                     E = 1.0f;
                 }
 
-                //cout<<E;
                 float danioMin = 0.01f * B * E * 85 * ((((0.2f * N + 1) * A * P) / (25 * D)) + 2);
                 float danioMax = 0.01f * B * E * 100 * ((((0.2f * N + 1) * A * P) / (25 * D)) + 2);
 
