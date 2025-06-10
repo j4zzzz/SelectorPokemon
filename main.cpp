@@ -1001,6 +1001,16 @@ int main() {
     }
     sf::Sprite fondoSprite(fondoTexture);
 
+    sf::Vector2u textureSize = fondoTexture.getSize();
+    sf::Vector2u windowSize = window.getSize();
+
+    // Calcular escala
+    float scaleX = static_cast<float>(windowSize.x) / textureSize.x;
+    float scaleY = static_cast<float>(windowSize.y) / textureSize.y;
+
+    // Escalar sprite
+    fondoSprite.setScale(scaleX, scaleY);
+
     Dropdown* currentlyExpanded = nullptr;
     Dropdown mainDropdown(40, 50, screenWidth / 3.0f - 80, 30.0f, pokemonNames, Resources::globalFont);
 
